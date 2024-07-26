@@ -165,7 +165,8 @@ def extract_pose_from_heatmaps(base_path: str,
     printout(f"Finished...", 'i')
 
 
-def save_heatmaps(rs_args: argparse.Namespace,
+def save_heatmaps(
+                  rs_args: argparse.Namespace,
                   op_args: argparse.Namespace):
 
     # PE = MPPE(op_args)
@@ -268,42 +269,51 @@ def save_heatmaps(rs_args: argparse.Namespace,
     printout(f"Finished...", 'i')
 
 def extract_pose_from_rgb(base_path: str,
+                          rs_args: argparse.Namespace,
                           op_args: argparse.Namespace,
-                          save_skeleton_plot=True):
-    PE = OpenPosePoseExtractor(op_args)
-    PE.pyop.configure(PE.pyop.params)
+                          save_skeleton_plot=True,
+                          face=True
+                          ):
+    PE = PoseExtractionMultithreading(op_args)
+    RSW = RealsenseWrapper(rs_args, rs_args.rs_dev)
 
-    devices = os.listdir(base_path)
-    trials = os.listdir(os.path.join(base_path, devices[0]))
+    if len(RSW.enabled_devices) == 0:
+        raise ValueError("no devices connected")
 
-    for device in devices:
-        for trial in trials:
-            path = f"{device}/{trial}/skeleton_fromrgb"
-            path = os.path.join(base_path, path)
-            os.makedirs(path, exist_ok=True)
+    RSW.initialize_depth_sensor_ae()
+    RSW.initialize()
 
-            # path = f"{device}/{trial}/color"
-            path = f"{device}/{trial}/color"
-            path = os.path.join(base_path, path)
-            rgb_files = [os.path.join(path, i)
-                        for i in sorted(os.listdir(path))]
+    if rs_args.rs_save_data:
+        RSW.storage_paths.create()
+        RSW.save_calib()
 
-            path = f"{device}/{trial}/depth"
-            path = os.path.join(base_path, path)
-            depth_files = [os.path.join(path, i)
-                           for i in sorted(os.listdir(path))]
+    RSW.flush_frames(rs_args.rs_fps * 3)
+    time.sleep(3)
 
-            path = f"{device}/{trial}/calib"
-            path = os.path.join(base_path, path, f"dev{device}_calib.json")
-            with open(path, 'r') as f:
-                calib_data = json.load(f)
+    device_sns = list(RSW.enabled_devices.keys())
+    device_sns = list(RSW.enabled_devices.keys())
+    timer = []
 
-            # h_c = calib_data['color']['height']
-            # w_c = calib_data['color']['width']
-            h_d = calib_data['depth'][0]['height']
-            w_d = calib_data['depth'][0]['width']
+    try:
+        c = 0
 
-            for rgb_file, depth_file in zip(rgb_files, depth_files):
+        while True:
+
+            start = time.time()
+            RSW.step(
+                display=0,
+                display_and_save_with_key=rs_args.rs_save_with_key,
+                use_colorizer=False
+            )
+            for idx, device_sn in enumerate(device_sns):
+
+                rgb_file = RSW.frames[device_sn]['skeleton_fromrgb']
+                color = RSW.frames[device_sn]['color']
+                depth_file = RSW.frames[device_sn]['depth']
+
+                h_d = depth_file[0]['height']
+                w_d = depth_file[0]['width']
+
                 # image = read_color_file(rgb_file)
                 # image = image.reshape(h_c, w_c, 3)
                 # recorded image is upside-down
@@ -322,5 +332,18 @@ def extract_pose_from_rgb(base_path: str,
                         "/color", "/skeleton_fromrgb"
                     ).replace(".png", ".txt")
                 )
+            timer.append(time.time() - start)
+    except Exception as e:
+        exc_type, exc_obj, exc_tb = sys.exc_info()
+        fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+        printout(f"{exc_type}, {fname}, {exc_tb.tb_lineno}", 'e')
+        printout(f"Exception msg : {e}", 'e')
+        traceback.print_tb(exc_tb)
+        printout(f"Stopping RealSense devices...", 'i')
+        RSW.stop()
+
+    finally:
+        printout(f"Final RealSense devices...", 'i')
+        RSW.stop()
 
     printout(f"Finished...", 'i')

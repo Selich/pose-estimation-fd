@@ -73,6 +73,10 @@ if __name__ == "__main__":
                    type=str2bool,
                    default=False,
                    help='Extract pose from RGB images')
+    p.add_argument('--face',
+                   type=str2bool,
+                   default=True,
+                   help='Enable face detection')
     args, _ = p.parse_known_args()
 
     rs_args = get_rs_args()
@@ -81,20 +85,21 @@ if __name__ == "__main__":
     op_args.save_heatmaps = args.save_heatmaps
     op_args.extract_pose_from_hm = args.extract_pose_from_hm
 
-    if args.extract_pose_from_hm:
-        # extract_pose_from_heatmaps(args.extract_pose, op_args,
-        #                            args.display_pose)
-
-        folders = os.listdir('/mnt/DHM-ICUSUITE-DS2/icu_recording/')
-        folders = [f for f in folders if '-15fps' in f]
-        for folder in folders:
-            args.extract_pose = os.path.join('/mnt/DHM-ICUSUITE-DS2/icu_recording/', folder)
-            extract_pose_from_heatmaps(args.extract_pose, op_args,
-                                       args.display_pose)
-    elif args.save_heatmaps:
-        save_heatmaps(rs_args, op_args)
-
-    elif args.extract_pose_from_rgb:
-        extract_pose_from_rgb(args.extract_pose, op_args, save_skeleton_plot=True)
-    else:
-        raise ValueError("No arg given...")
+    # if args.extract_pose_from_hm:
+    #     # extract_pose_from_heatmaps(args.extract_pose, op_args,
+    #     #                            args.display_pose)
+    #
+    #     folders = os.listdir('/mnt/DHM-ICUSUITE-DS2/icu_recording/')
+    #     folders = [f for f in folders if '-15fps' in f]
+    #     for folder in folders:
+    #         args.extract_pose = os.path.join('/mnt/DHM-ICUSUITE-DS2/icu_recording/', folder)
+    #         extract_pose_from_heatmaps(args.extract_pose, op_args,
+    #                                    args.display_pose)
+    # elif args.save_heatmaps:
+    #     save_heatmaps(rs_args, op_args)
+    #
+    # elif args.extract_pose_from_rgb:
+    #     extract_pose_from_rgb(args.extract_pose, rs_args, op_args, save_skeleton_plot=True, face=args.face)
+    # else:
+    #     raise ValueError("No arg given...")
+    extract_pose_from_rgb(args.extract_pose, rs_args, op_args, save_skeleton_plot=True, face=args.face)
