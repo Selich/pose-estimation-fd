@@ -276,12 +276,12 @@ def extract_pose_from_rgb(base_path: str,
                           ):
     PE = PoseExtractionMultithreading(op_args)
     RSW = RealsenseWrapper(rs_args, rs_args.rs_dev)
+    RSW.initialize_depth_sensor_ae()
+    RSW.initialize()
 
     if len(RSW.enabled_devices) == 0:
         raise ValueError("no devices connected")
 
-    RSW.initialize_depth_sensor_ae()
-    RSW.initialize()
 
     if rs_args.rs_save_data:
         RSW.storage_paths.create()
@@ -307,12 +307,13 @@ def extract_pose_from_rgb(base_path: str,
             )
             for idx, device_sn in enumerate(device_sns):
 
-                rgb_file = RSW.frames[device_sn]['skeleton_fromrgb']
-                color = RSW.frames[device_sn]['color']
-                depth_file = RSW.frames[device_sn]['depth']
+                print(RSW.frames[device_sn])
 
-                h_d = depth_file[0]['height']
-                w_d = depth_file[0]['width']
+                rgb_file = RSW.frames[device_sn]['color_metadata']
+                depth_file = RSW.frames[device_sn]['depth_metadata']
+
+                h_d = 480
+                w_d = 848
 
                 # image = read_color_file(rgb_file)
                 # image = image.reshape(h_c, w_c, 3)
