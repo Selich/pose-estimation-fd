@@ -274,13 +274,16 @@ def extract_pose_from_rgb(base_path: str,
                           save_skeleton_plot=True,
                           face=True
                           ):
+
     PE = PoseExtractionMultithreading(op_args)
     RSW = RealsenseWrapper(rs_args, rs_args.rs_dev)
     RSW.initialize_depth_sensor_ae()
-    RSW.initialize()
 
     if len(RSW.enabled_devices) == 0:
         raise ValueError("no devices connected")
+
+    RSW = RealsenseWrapper(rs_args, rs_args.rs_dev)
+    RSW.initialize()
 
 
     if rs_args.rs_save_data:
@@ -291,8 +294,14 @@ def extract_pose_from_rgb(base_path: str,
     time.sleep(3)
 
     device_sns = list(RSW.enabled_devices.keys())
-    device_sns = list(RSW.enabled_devices.keys())
     timer = []
+    skeleton_dirs = []
+
+    for device_sn in device_sns:
+        skeleton_dirs.append(
+            RSW.storage_paths.color[device_sn].replace("/color", "/skeleton")
+        )
+        RSW.storage_paths.color[device_sn] = None
 
     try:
         c = 0
@@ -306,34 +315,34 @@ def extract_pose_from_rgb(base_path: str,
                 use_colorizer=False
             )
             for idx, device_sn in enumerate(device_sns):
-
-                print(RSW.frames[device_sn])
-
-                rgb_file = RSW.frames[device_sn]['color_metadata']
-                depth_file = RSW.frames[device_sn]['depth_metadata']
-
-                h_d = 480
-                w_d = 848
-
-                # image = read_color_file(rgb_file)
-                # image = image.reshape(h_c, w_c, 3)
-                # recorded image is upside-down
-                # image = np.rot90(image, 2)
-                image = cv2.imread(rgb_file)
-                image = cv2.rotate(image, cv2.ROTATE_180)
-
-                depth = read_depth_file(depth_file)
-                depth = depth[-h_d * w_d:].reshape(h_d, w_d)
-                depth = np.rot90(depth, 2)
-
-                PE.predict(
-                    image=image,
-                    depth=depth,
-                    kpt_save_path=rgb_file.replace(
-                        "/color", "/skeleton_fromrgb"
-                    ).replace(".png", ".txt")
+                PE.CQ[idx].put(
+                    (RSW.frames[device_sn]['color_framedata'],
+                     os.path.join(
+                        skeleton_dirs[idx],
+                        str(RSW.internal_timestamp[device_sn])) + ".float",
+                     False)
                 )
+
             timer.append(time.time() - start)
+
+            if c % rs_args.rs_fps == 0:
+                printout(
+                    f"Step {c:12d} :: "
+                    f"{len(timer)//sum(timer)} :: "
+                    f"{[i.get('color_timestamp', None) for i in RSW.frames.values()]} :: "  # noqa
+                    f"{[i.get('depth_timestamp', None) for i in RSW.frames.values()]}",  # noqa
+                    'i'
+                )
+                timer = []
+
+            if not len(RSW.frames) > 0:
+                printout(f"Empty...", 'w')
+                continue
+
+            c += 1
+            if c > rs_args.rs_steps:
+                break
+
     except Exception as e:
         exc_type, exc_obj, exc_tb = sys.exc_info()
         fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
